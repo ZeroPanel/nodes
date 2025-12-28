@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NebulaPanel - Server Management</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body { 
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; 
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+        color: #e2e8f0; 
+        padding: 20px;
+        overflow-y: auto;
+      }
+      
+      .container { max-width: 1400px; margin: 0 auto; }
+      
+      h1 { 
+        font-size: 32px; 
+        margin: 0 0 24px; 
+        font-weight: 700;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+      
+      .card { 
+        background: rgba(17, 24, 39, 0.8); 
+        border: 1px solid #1f2937; 
+        border-radius: 16px; 
+        padding: 20px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        backdrop-filter: blur(10px);
+      }
+      
+      .card-title { 
+        font-size: 14px; 
+        font-weight: 600; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
+        color: #94a3b8; 
+        margin: 0 0 12px; 
+      }
+      
+      .stat { 
+        font-size: 36px; 
+        font-weight: 700; 
+        margin: 8px 0;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+      
+      .maintenance-card {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      
+      .maintenance-card.enabled {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.1) 100%);
+        border-color: rgba(34, 197, 94, 0.3);
+      }
+      
+      .maintenance-code {
+        font-size: 48px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-align: center;
+        padding: 20px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 12px;
+        margin: 16px 0;
+        font-family: 'Courier New', monospace;
+      }
+      
+      .maintenance-code.enabled { color: #22c55e; }
+      .maintenance-code.disabled { color: #ef4444; }
+      
+      button { 
+        width: 100%;
+        padding: 14px 20px; 
+        border-radius: 12px; 
+        border: none;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      
+      .btn-maintenance {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+      }
+      
+      .btn-maintenance:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+      }
+      
+      .btn-maintenance.enabled {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      }
+      
+      .btn-maintenance.enabled:hover {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
+      }
+      
+      .status-badge { 
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      
+      .status-badge.connected { 
+        background: rgba(34, 197, 94, 0.2); 
+        color: #22c55e; 
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      
+      .status-badge.disconnected { 
+        background: rgba(239, 68, 68, 0.2); 
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+      
+      .server-list {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      
+      .server-item {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+      }
+      
+      .server-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      
+      .server-id {
+        font-weight: 600;
+        color: #60a5fa;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+      }
+      
+      .server-detail {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+      }
+      
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 100%);
+        transition: width 0.3s ease;
+      }
+      
+      .system-info {
+        display: grid;
+        gap: 12px;
+      }
+      
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(31, 41, 55, 0.5);
+      }
+      
+      .info-label { color: #94a3b8; font-size: 13px; }
+      .info-value { color: #e2e8f0; font-weight: 600; font-size: 13px; }
+      
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      
+      .pulse { animation: pulse 2s ease-in-out infinite; }
+      
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>⚡ NebulaPanel</h1>
+      
+      <div class="grid">
+        <!-- Maintenance Mode Card -->
+        <div class="card maintenance-card" id="maintenanceCard">
+          <div class="card-title">Maintenance Mode</div>
+          <div class="maintenance-code disabled pulse" id="maintenanceCode">--------</div>
+          <div style="text-align: center; margin-bottom: 16px;">
+            <span class="status-badge disconnected" id="maintenanceStatus">DISABLED</span>
+          </div>
+          <button class="btn-maintenance" id="toggleMaintenance">Enable Maintenance</button>
+          <div class="stat-label" style="text-align: center; margin-top: 12px;" id="maintenanceTime">Not in maintenance</div>
+        </div>
+        
+        <!-- System Status Card -->
+        <div class="card">
+          <div class="card-title">System Status</div>
+          <div class="info-row">
+            <span class="info-label">Connection</span>
+            <span class="status-badge disconnected" id="connectionStatus">Connecting...</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Server ID</span>
+            <span class="info-value" id="serverId">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Total Connections</span>
+            <span class="info-value" id="totalConnections">0</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Uptime</span>
+            <span class="info-value" id="uptime">-</span>
+          </div>
+        </div>
+        
+        <!-- CPU Card -->
+        <div class="card">
+          <div class="card-title">CPU Usage</div>
+          <div class="stat" id="cpuUsage">--%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="cpuProgress" style="width: 0%"></div>
+          </div>
+          <div class="stat-label" id="cpuModel">Loading...</div>
+        </div>
+      </div>
+      
+      <div class="grid">
+        <!-- RAM Card -->
+        <div class="card">
+          <div class="card-title">Memory (RAM)</div>
+          <div class="stat" id="ramUsage">--%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="ramProgress" style="width: 0%"></div>
+          </div>
+          <div class="stat-label" id="ramInfo">Loading...</div>
+        </div>
+        
+        <!-- Storage Card -->
+        <div class="card">
+          <div class="card-title">Storage</div>
+          <div class="stat" id="storageUsage">--%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="storageProgress" style="width: 0%"></div>
+          </div>
+          <div class="stat-label" id="storageInfo">Loading...</div>
+        </div>
+        
+        <!-- Location Card -->
+        <div class="card">
+          <div class="card-title">Server Location</div>
+          <div class="stat" style="font-size: 24px;" id="location">...</div>
+        </div>
+      </div>
+      
+      <!-- Connected Servers -->
+      <div class="card" style="margin-top: 16px;">
+        <div class="card-title">Connected Servers</div>
+        <div class="server-list" id="serverList">
+          <div style="text-align: center; color: #64748b; padding: 20px;">No servers connected</div>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      let ws = null;
+      let maintenanceEnabled = false;
+      
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      };
+      
+      const formatUptime = (seconds) => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        return `${days}d ${hours}h ${mins}m`;
+      };
+      
+      const formatTime = (isoString) => {
+        if (!isoString) return '-';
+        const date = new Date(isoString);
+        return date.toLocaleTimeString();
+      };
+      
+      const updateMaintenanceUI = (maintenance) => {
+        maintenanceEnabled = maintenance.enabled;
+        const card = document.getElementById('maintenanceCard');
+        const code = document.getElementById('maintenanceCode');
+        const status = document.getElementById('maintenanceStatus');
+        const btn = document.getElementById('toggleMaintenance');
+        const time = document.getElementById('maintenanceTime');
+        
+        code.textContent = maintenance.code;
+        
+        if (maintenance.enabled) {
+          card.classList.add('enabled');
+          code.classList.remove('disabled');
+          code.classList.add('enabled');
+          status.textContent = 'ENABLED';
+          status.classList.remove('disconnected');
+          status.classList.add('connected');
+          btn.textContent = 'Disable Maintenance';
+          btn.classList.add('enabled');
+          time.textContent = `Enabled at ${formatTime(maintenance.enabledAt)}`;
+        } else {
+          card.classList.remove('enabled');
+          code.classList.remove('enabled');
+          code.classList.add('disabled');
+          status.textContent = 'DISABLED';
+          status.classList.remove('connected');
+          status.classList.add('disconnected');
+          btn.textContent = 'Enable Maintenance';
+          btn.classList.remove('enabled');
+          time.textContent = 'Not in maintenance';
+        }
+      };
+      
+      const updateServerList = (servers) => {
+        const list = document.getElementById('serverList');
+        
+        if (!servers || servers.length === 0) {
+          list.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No servers connected</div>';
+          return;
+        }
+        
+        list.innerHTML = servers.map(server => `
+          <div class="server-item">
+            <div class="server-item-header">
+              <span class="server-id">${server.id}</span>
+              <span class="status-badge connected">ONLINE</span>
+            </div>
+            <div class="server-detail">📍 ${server.address}</div>
+            <div class="server-detail">🔌 Connected: ${formatTime(server.connectedAt)}</div>
+            <div class="server-detail">📡 Last Ping: ${formatTime(server.lastPing)}</div>
+          </div>
+        `).join('');
+      };
+      
+      const connectWebSocket = () => {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${scheme}://${location.host}`);
+        
+        ws.addEventListener('open', () => {
+          document.getElementById('connectionStatus').textContent = 'Connected';
+          document.getElementById('connectionStatus').classList.remove('disconnected');
+          document.getElementById('connectionStatus').classList.add('connected');
+          
+          // Request initial data
+          ws.send(JSON.stringify({ type: 'get_servers' }));
+        });
+        
+        ws.addEventListener('close', () => {
+          document.getElementById('connectionStatus').textContent = 'Disconnected';
+          document.getElementById('connectionStatus').classList.remove('connected');
+          document.getElementById('connectionStatus').classList.add('disconnected');
+          
+          // Reconnect after 3 seconds
+          setTimeout(connectWebSocket, 3000);
+        });
+        
+        ws.addEventListener('message', (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            
+            if (data.type === 'welcome') {
+              document.getElementById('serverId').textContent = data.serverId;
+              if (data.maintenance) {
+                updateMaintenanceUI(data.maintenance);
+              }
+            }
+            
+            if (data.type === 'system_info') {
+              const info = data.data;
+              
+              // CPU
+              document.getElementById('cpuUsage').textContent = `${info.cpu.usage}%`;
+              document.getElementById('cpuProgress').style.width = `${info.cpu.usage}%`;
+              document.getElementById('cpuModel').textContent = `${info.cpu.count} cores - ${info.cpu.model}`;
+              
+              // RAM
+              document.getElementById('ramUsage').textContent = `${info.ram.percent}%`;
+              document.getElementById('ramProgress').style.width = `${info.ram.percent}%`;
+              document.getElementById('ramInfo').textContent = `${formatBytes(info.ram.used)} / ${formatBytes(info.ram.total)} (${info.ram.type})`;
+              
+              // Storage
+              document.getElementById('storageUsage').textContent = `${info.storage.percent}%`;
+              document.getElementById('storageProgress').style.width = `${info.storage.percent}%`;
+              document.getElementById('storageInfo').textContent = `${formatBytes(info.storage.used)} / ${formatBytes(info.storage.total)} (${info.storage.type})`;
+              
+              // Location
+              document.getElementById('location').textContent = info.location;
+              
+              // Uptime
+              document.getElementById('uptime').textContent = formatUptime(info.uptime);
+            }
+            
+            if (data.type === 'maintenance_update') {
+              updateMaintenanceUI(data.maintenance);
+            }
+            
+            if (data.type === 'server_list') {
+              updateServerList(data.servers);
+              document.getElementById('totalConnections').textContent = data.servers.length;
+            }
+            
+            if (data.type === 'health_response') {
+              if (data.maintenance) {
+                updateMaintenanceUI(data.maintenance);
+              }
+              document.getElementById('totalConnections').textContent = data.connections || 0;
+            }
+            
+          } catch (err) {
+            console.error('Error parsing message:', err);
+          }
+        });
+      };
+      
+      // Toggle maintenance mode
+      document.getElementById('toggleMaintenance').addEventListener('click', () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'toggle_maintenance' }));
+        }
+      });
+      
+      // Start connection
+      connectWebSocket();
+      
+      // Periodic updates
+      setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'health' }));
+        }
+      }, 5000);
+    </script>
+  </body>
+</html>
