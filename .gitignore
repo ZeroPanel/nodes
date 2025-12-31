@@ -1,1 +1,4 @@
 node_modules
+.nebula
+dist
+volumes

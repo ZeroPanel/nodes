@@ -1,17 +1,35 @@
 import http from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
-import type { RawData } from 'ws';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { promises as fs } from 'node:fs';
-import https from 'node:https';
+
+// Import modular utilities
+import { Logger } from './utils/logger';
+import { getSystemInfo, generateMaintenanceCode, getDiskType } from './utils/system-info';
+import { getConfig, updateDockerSocket } from './utils/config';
+import {
+  initDocker,
+  getDockerContainers,
+} from './events/docker-events';
+import {
+  handleCreateEndpoint,
+  handleContainerInfoEndpoint,
+  handleHealthEndpoint,
+  handleMainEndpoint,
+  connectedServers,
+  healthEndpoints,
+} from './events/ws-events';
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 
-let cachedLocation: string | null = null;
+// Initialize Docker
+(async () => {
+  await initDocker();
+})();
 
 // Maintenance mode state
 interface MaintenanceState {
@@ -26,195 +44,51 @@ const maintenanceState: MaintenanceState = {
   enabledAt: null,
 };
 
-// Connected servers tracking
-interface ConnectedServer {
-  id: string;
-  address: string;
-  connectedAt: string;
-  lastPing: string;
-}
-
-const connectedServers = new Map<WebSocket, ConnectedServer>();
-const healthEndpoints = new Set<WebSocket>();
-
-// Generate a unique maintenance code
-function generateMaintenanceCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
-// Detect disk type (SSD, HDD, NVMe, etc.)
-async function getDiskType(): Promise<string> {
-  try {
-    // Try to detect from /sys/block devices
-    const devices = await fs.readdir('/sys/block');
-    
-    for (const device of devices) {
-      if (device.startsWith('sd') || device.startsWith('vd') || device.startsWith('hd')) {
-        try {
-          // Check if it's rotational (HDD) or not (SSD)
-          const rotationalPath = `/sys/block/${device}/queue/rotational`;
-          const content = await fs.readFile(rotationalPath, 'utf8');
-          if (content.trim() === '0') {
-            return 'SSD';
-          } else {
-            return 'HDD';
-          }
-        } catch {
-          continue;
-        }
-      } else if (device.startsWith('nvme')) {
-        return 'NVMe';
-      }
-    }
-  } catch {
-    // Fallback
-  }
-  return 'Unknown';
-}
-
-// Detect RAM type (DDR3, DDR4, DDR5, etc.)
-async function getRamType(): Promise<string> {
-  try {
-    // Try to get RAM type from dmidecode if available
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    const execFileAsync = promisify(execFile);
-    
-    try {
-      const { stdout } = await execFileAsync('dmidecode', ['-t', 'memory'], { timeout: 5000 });
-      
-      // Look for Memory Type in dmidecode output
-      const lines = stdout.split('\n');
-      for (const line of lines) {
-        if (line.includes('Type:') && !line.includes('Type Detail')) {
-          const match = line.match(/Type:\s*(.+)/i);
-          if (match) {
-            return match[1].trim();
-          }
-        }
-      }
-    } catch {
-      // dmidecode might not be available or require root
-    }
-  } catch {
-    // Fallback
-  }
-  return 'Unknown';
-}
-
-// Auto-detect location using geolocation API
-async function getLocation(): Promise<string> {
-  // Return cached location if available
-  if (cachedLocation) {
-    return cachedLocation;
-  }
-
-  try {
-    const location = await new Promise<string>((resolve) => {
-      https.get('https://ip-api.com/json/', (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            if (json.status === 'success') {
-              const city = json.city || 'Unknown';
-              const country = json.country || 'Unknown';
-              const countryCode = json.countryCode || 'XX';
-              const region = json.region || 'XX';
-              // Format: "City, Country (CC-REGION-01)"
-              const location = `${city}, ${country} (${countryCode}-${region}-01)`;
-              cachedLocation = location;
-              resolve(location);
-            } else {
-              resolve('Unknown Location');
-            }
-          } catch {
-            resolve('Unknown Location');
-          }
-        });
-      }).on('error', () => {
-        resolve('Unknown Location');
-      });
-    });
-    return location;
-  } catch {
-    return 'Unknown Location';
-  }
-}
-
-// System info gathering functions
-async function getSystemInfo() {
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-  const usedMem = totalMem - freeMem;
-  
-  const cpus = os.cpus();
-  const cpuCount = cpus.length;
-  
-  // Calculate average CPU usage
-  let totalIdle = 0;
-  let totalTick = 0;
-  cpus.forEach(cpu => {
-    for (const type in cpu.times) {
-      totalTick += cpu.times[type as keyof typeof cpu.times];
-    }
-    totalIdle += cpu.times.idle;
-  });
-  const cpuUsage = 100 - Math.round((100 * totalIdle) / totalTick);
-  
-  // Get disk space info (root partition)
-  let totalDisk = 0;
-  let usedDisk = 0;
-  try {
-    const stats = await fs.statfs('/');
-    totalDisk = stats.blocks * stats.bsize;
-    usedDisk = (stats.blocks - stats.bavail) * stats.bsize;
-  } catch (err) {
-    // Fallback if statfs fails
-    console.warn('Could not retrieve disk info:', err);
-  }
-
-  const location = await getLocation();
-  const diskType = await getDiskType();
-  const ramType = await getRamType();
-  
-  return {
-    location: location,
-    storage: {
-      type: diskType,
-      total: totalDisk,
-      used: usedDisk,
-      free: totalDisk - usedDisk,
-      percent: totalDisk > 0 ? Math.round((usedDisk / totalDisk) * 100) : 0,
-    },
-    ram: {
-      type: ramType,
-      total: totalMem,
-      used: usedMem,
-      free: freeMem,
-      percent: Math.round((usedMem / totalMem) * 100),
-    },
-    cpu: {
-      count: cpuCount,
-      usage: cpuUsage,
-      model: cpus[0]?.model || 'Unknown',
-    },
-    uptime: os.uptime(),
-    timestamp: new Date().toISOString(),
-  };
-}
-
 // Simple HTTP server to serve the client page
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  
+  // Configuration endpoints
+  if (url.pathname === '/api/config') {
+    if (req.method === 'GET') {
+      try {
+        const config = await getConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(config, null, 2));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to get configuration' }));
+      }
+    } else if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', async () => {
+        try {
+          const data = JSON.parse(body);
+          const { socketPath, useDesktopSocket } = data;
+          
+          if (!socketPath) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'socketPath is required' }));
+            return;
+          }
+          
+          await updateDockerSocket(socketPath, !!useDesktopSocket);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'Docker socket configuration updated' }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Failed to update configuration' }));
+        }
+      });
+    } else {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+    }
+    return;
+  }
   
   // Health check endpoint
   if (url.pathname === '/health') {
@@ -250,6 +124,19 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
+  
+  if (url.pathname === '/create') {
+    try {
+      const html = await readFile(path.join(PUBLIC_DIR, 'create.html'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Failed to load create page');
+    }
+    return;
+  }
+  
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 });
@@ -260,6 +147,7 @@ const wss = new WebSocketServer({ server });
 // Track liveness without mutating ws objects
 const isAlive = new WeakMap<WebSocket, boolean>();
 
+// Handle WebSocket connections
 wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const clientAddr = req.socket.remoteAddress || 'unknown';
@@ -267,219 +155,84 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   // Generate unique server ID
   const serverId = `SRV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-  // Handle health check endpoint - keep connection alive
-  if (url.pathname === '/health') {
-    console.log(`[ws-health] client connected from ${clientAddr}`);
-    
-    // Track this health endpoint connection
-    healthEndpoints.add(ws);
-    
-    // Track liveness for health endpoint
-    isAlive.set(ws, true);
-    ws.on('pong', () => {
-      isAlive.set(ws, true);
-    });
-    
-    // Function to send health data
-    const sendHealthData = async () => {
-      try {
-        // Get disk space info
-        let totalDisk = 0;
-        let usedDisk = 0;
-        let diskType = 'Unknown';
-        try {
-          const stats = await fs.statfs('/');
-          totalDisk = stats.blocks * stats.bsize;
-          usedDisk = (stats.blocks - stats.bavail) * stats.bsize;
-          diskType = await getDiskType();
-        } catch {
-          // Disk info unavailable
-        }
-        
-        const healthData = {
-          type: 'health_response',
-          status: maintenanceState.enabled ? 'maintenance' : 'healthy',
-          timestamp: new Date().toISOString(),
-          uptime: os.uptime(),
-          memory: {
-            total: os.totalmem(),
-            free: os.freemem(),
-            usage: Math.round((1 - os.freemem() / os.totalmem()) * 100),
-          },
-          storage: {
-            type: diskType,
-            total: totalDisk,
-            used: usedDisk,
-            free: totalDisk - usedDisk,
-            percent: totalDisk > 0 ? Math.round((usedDisk / totalDisk) * 100) : 0,
-          },
-          connections: wss.clients.size,
-          maintenance: maintenanceState,
-        };
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(healthData));
-        }
-      } catch (err) {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ 
-            type: 'health_response', 
-            status: 'unhealthy', 
-            error: 'Health check failed' 
-          }));
-        }
-      }
-    };
-    
-    // Send initial health data
-    sendHealthData();
-    
-    // Send health data every 1 minute
-    const healthInterval = setInterval(sendHealthData, 60000);
-    
-    // Handle messages on health endpoint
-    ws.on('message', async (data: RawData) => {
-      sendHealthData();
-    });
-    
-    ws.on('close', () => {
-      console.log('[ws-health] client disconnected');
-      healthEndpoints.delete(ws);
-      clearInterval(healthInterval);
-    });
-    
-    ws.on('error', (err: Error) => {
-      console.error('[ws-health] error:', err.message);
-      healthEndpoints.delete(ws);
-      clearInterval(healthInterval);
-    });
-    
-    return;
-  }
-
-  // Main WebSocket endpoint
   // Track liveness
   isAlive.set(ws, true);
   ws.on('pong', () => {
     isAlive.set(ws, true);
   });
 
-  console.log(`[ws] client connected from ${clientAddr} [${serverId}]`);
+  // Route to appropriate handler based on pathname
+  console.log(`[server] WebSocket connection to: ${url.pathname}`);
   
-  // Track connected server
-  const serverInfo: ConnectedServer = {
-    id: serverId,
-    address: clientAddr,
-    connectedAt: new Date().toISOString(),
-    lastPing: new Date().toISOString(),
-  };
-  connectedServers.set(ws, serverInfo);
-
-  // Send welcome message with maintenance status
-  ws.send(JSON.stringify({ 
-    type: 'welcome', 
-    message: 'Connected to TypeScript WebSocket server',
-    serverId: serverId,
-    maintenance: maintenanceState,
-  }));
-
-  // Send system info on connection
-  try {
-    const systemInfo = await getSystemInfo();
-    ws.send(JSON.stringify({ type: 'system_info', data: systemInfo }));
-  } catch (err) {
-    console.error('Error gathering system info:', err);
+  if (url.pathname === '/create') {
+    console.log('[server] Routing to /create endpoint');
+    await handleCreateEndpoint(ws, clientAddr);
+    return;
   }
-  
-  // Broadcast updated server list to all clients
-  broadcastServerList();
 
-  ws.on('message', async (data: RawData) => {
-    let payload: any;
-    try {
-      payload = typeof data === 'string' ? JSON.parse(data) : JSON.parse(data.toString());
-    } catch {
-      payload = { type: 'message', text: data.toString() };
-    }
-    
-    // Update last ping time
-    const server = connectedServers.get(ws);
-    if (server) {
-      server.lastPing = new Date().toISOString();
-    }
+  // Allow both /containers/{id} and /container/{id}
+  const containerInfoMatch = url.pathname.match(/^\/containers?\/([^/]+)$/);
+  if (containerInfoMatch) {
+    const containerId = containerInfoMatch[1];
+    console.log(`[server] Routing to /containers/${containerId} endpoint`);
+    console.log(`[/containers/${containerId} endpoint] Connection established from ${clientAddr}`);
 
-    // Handle maintenance toggle
-    if (payload.type === 'toggle_maintenance') {
-      maintenanceState.enabled = !maintenanceState.enabled;
-      if (maintenanceState.enabled) {
-        maintenanceState.code = generateMaintenanceCode();
-        maintenanceState.enabledAt = new Date().toISOString();
-      } else {
-        maintenanceState.enabledAt = null;
-      }
-      console.log(`[maintenance] ${maintenanceState.enabled ? 'ENABLED' : 'DISABLED'} - Code: ${maintenanceState.code}`);
-      broadcastMaintenanceStatus();
-      return;
-    }
+    await handleContainerInfoEndpoint(ws, containerId, clientAddr);
+    return;
+  }
 
-    // Handle health check requests
-    if (payload.type === 'health') {
+  if (url.pathname === '/health') {
+    const getHealthData = async () => {
+      let totalDisk = 0;
+      let usedDisk = 0;
+      let diskType = 'Unknown';
       try {
-        const healthData = {
-          type: 'health_response',
-          status: maintenanceState.enabled ? 'maintenance' : 'healthy',
-          timestamp: new Date().toISOString(),
-          uptime: os.uptime(),
-          memory: {
-            total: os.totalmem(),
-            free: os.freemem(),
-            usage: Math.round((1 - os.freemem() / os.totalmem()) * 100),
-          },
-          connections: wss.clients.size,
-          maintenance: maintenanceState,
-        };
-        ws.send(JSON.stringify(healthData));
-      } catch (err) {
-        ws.send(JSON.stringify({ 
-          type: 'health_response', 
-          status: 'unhealthy', 
-          error: 'Health check failed' 
-        }));
+        const stats = await fs.statfs('/');
+        totalDisk = stats.blocks * stats.bsize;
+        usedDisk = (stats.blocks - stats.bavail) * stats.bsize;
+        diskType = await getDiskType();
+      } catch {
+        // Disk info unavailable
       }
-      return;
-    }
-    
-    // Request server list
-    if (payload.type === 'get_servers') {
-      ws.send(JSON.stringify({
-        type: 'server_list',
-        servers: Array.from(connectedServers.values()),
-      }));
-      return;
-    }
+      
+      return {
+        type: 'health_response',
+        status: maintenanceState.enabled ? 'maintenance' : 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: os.uptime(),
+        memory: {
+          total: os.totalmem(),
+          free: os.freemem(),
+          usage: Math.round((1 - os.freemem() / os.totalmem()) * 100),
+        },
+        storage: {
+          type: diskType,
+          total: totalDisk,
+          used: usedDisk,
+          free: totalDisk - usedDisk,
+          percent: totalDisk > 0 ? Math.round((usedDisk / totalDisk) * 100) : 0,
+        },
+        connections: wss.clients.size,
+        maintenance: maintenanceState,
+      };
+    };
 
-    // Broadcast messages to all clients
-    const out = JSON.stringify({ type: 'broadcast', from: clientAddr, payload });
-    for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(out);
-      }
-    }
-  });
+    await handleHealthEndpoint(ws, clientAddr, getHealthData);
+    return;
+  }
 
-  ws.on('close', () => {
-    const server = connectedServers.get(ws);
-    if (server) {
-      console.log(`[ws] client disconnected [${server.id}]`);
-      connectedServers.delete(ws);
-      broadcastServerList();
-    } else {
-      console.log('[ws] client disconnected');
-    }
-  });
-
-  ws.on('error', (err: Error) => {
-    console.error('[ws] error:', err.message);
-  });
+  // Main endpoint
+  console.log('[server] Routing to main endpoint');
+  await handleMainEndpoint(
+    ws,
+    clientAddr,
+    serverId,
+    maintenanceState,
+    broadcastServerList,
+    broadcastMaintenanceStatus,
+    broadcastContainerUpdate,
+    getSystemInfo
+  );
 });
 
 // Ping clients periodically; terminate dead connections
@@ -511,16 +264,23 @@ function broadcastMaintenanceStatus() {
     }
   }
   
-  // Send immediate health update to health endpoint clients
+  // Send immediate health update to health endpoint clients (as stats format)
   const healthData = {
-    type: 'health_response',
+    type: 'container_stats',
     status: maintenanceState.enabled ? 'maintenance' : 'healthy',
     timestamp: new Date().toISOString(),
     uptime: os.uptime(),
+    cpu: {
+      usage: 0,
+    },
     memory: {
-      total: os.totalmem(),
-      free: os.freemem(),
-      usage: Math.round((1 - os.freemem() / os.totalmem()) * 100),
+      usage: os.totalmem() - os.freemem(),
+      limit: os.totalmem(),
+      percent: Math.round((1 - os.freemem() / os.totalmem()) * 100),
+    },
+    disk: {
+      read: 0,
+      write: 0,
     },
     storage: {
       type: 'Unknown',
@@ -533,7 +293,6 @@ function broadcastMaintenanceStatus() {
     maintenance: maintenanceState,
   };
   
-  // Try to get disk info
   (async () => {
     try {
       const stats = await fs.statfs('/');
@@ -568,8 +327,24 @@ function broadcastServerList() {
   }
 }
 
+// Broadcast container updates to all clients
+async function broadcastContainerUpdate() {
+  const containers = await getDockerContainers();
+  const message = JSON.stringify({
+    type: 'container_list',
+    containers: containers,
+  });
+  
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN && !healthEndpoints.has(client)) {
+      client.send(message);
+    }
+  }
+}
+
+// Start server
 server.listen(PORT, () => {
-  console.log(`HTTP server listening on http://localhost:${PORT}`);
-  console.log(`WebSocket endpoint available at ws://localhost:${PORT}`);
-  console.log(`Initial maintenance code: ${maintenanceState.code}`);
+  Logger.server(`HTTP server listening on http://localhost:${PORT}`);
+  Logger.server(`WebSocket endpoint available at ws://localhost:${PORT}`);
+  Logger.maintenance(`Initial maintenance code: ${maintenanceState.code}`);
 });

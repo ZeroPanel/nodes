@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Container - NebulaPanel</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body { 
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; 
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+        color: #e2e8f0; 
+        padding: 20px;
+        overflow-y: auto;
+      }
+      
+      .container { max-width: 800px; margin: 0 auto; }
+      
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      
+      h1 { 
+        font-size: 32px; 
+        margin: 0; 
+        font-weight: 700;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      .back-link {
+        color: #60a5fa;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 10px 16px;
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        border-radius: 8px;
+        transition: all 0.2s;
+      }
+      
+      .back-link:hover {
+        background: rgba(96, 165, 250, 0.1);
+        border-color: rgba(96, 165, 250, 0.5);
+      }
+      
+      .card { 
+        background: rgba(17, 24, 39, 0.8); 
+        border: 1px solid #1f2937; 
+        border-radius: 16px; 
+        padding: 32px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        backdrop-filter: blur(10px);
+        margin-bottom: 20px;
+      }
+      
+      .section-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 20px;
+        color: #e2e8f0;
+      }
+      
+      .form-group {
+        margin-bottom: 24px;
+      }
+      
+      .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+      
+      .form-help {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 4px;
+      }
+      
+      .form-input, .form-select, .form-textarea {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #374151;
+        background: #0b1220;
+        color: #e2e8f0;
+        font-family: inherit;
+        font-size: 14px;
+      }
+      
+      .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+      
+      .form-input:focus, .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+      }
+      
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      
+      .port-mapping {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      
+      .port-input {
+        flex: 1;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #374151;
+        background: #0b1220;
+        color: #e2e8f0;
+        font-size: 13px;
+      }
+      
+      .btn-remove {
+        padding: 8px 12px;
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
+      
+      .btn-remove:hover {
+        background: rgba(239, 68, 68, 0.3);
+      }
+      
+      .btn-add {
+        padding: 10px 16px;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.2s;
+        width: 100%;
+      }
+      
+      .btn-add:hover {
+        background: rgba(59, 130, 246, 0.3);
+      }
+      
+      .env-var {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        display: grid;
+        grid-template-columns: 1fr 2fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      
+      .checkbox-input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      
+      .checkbox-label {
+        font-size: 14px;
+        color: #e2e8f0;
+        cursor: pointer;
+      }
+      
+      .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #1f2937;
+      }
+      
+      .btn {
+        flex: 1;
+        padding: 14px 24px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      
+      .btn-cancel {
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+      
+      .btn-cancel:hover {
+        background: rgba(59, 130, 246, 0.3);
+      }
+      
+      .btn-create {
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        color: white;
+      }
+      
+      .btn-create:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
+      }
+      
+      .status-message {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+      
+      .status-message.success {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        display: block;
+      }
+      
+      .status-message.error {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        display: block;
+      }
+      
+      .loading {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🐳 Create Docker Container</h1>
+        <a href="/" class="back-link">← Back to Dashboard</a>
+      </div>
+      
+      <div id="statusMessage" class="status-message"></div>
+      
+      <form id="createContainerForm">
+        <div class="card">
+          <div class="section-title">Basic Configuration</div>
+          
+          <div class="form-group">
+            <label class="form-label">Container Name *</label>
+            <input type="text" class="form-input" id="containerName" placeholder="my-container" required>
+            <div class="form-help">A unique name for your container</div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Docker Image *</label>
+            <input type="text" class="form-input" id="containerImage" placeholder="nginx:latest" required>
+            <div class="form-help">Docker image to use (e.g., nginx:latest, mysql:8.0, node:20-alpine)</div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="section-title">Port Mappings</div>
+          <div id="portMappings">
+            <div class="port-mapping">
+              <input type="text" class="port-input" placeholder="Host Port" data-type="host">
+              <span style="color: #64748b;">→</span>
+              <input type="text" class="port-input" placeholder="Container Port" data-type="container">
+              <button type="button" class="btn-remove" onclick="removePort(this)">Remove</button>
+            </div>
+          </div>
+          <button type="button" class="btn-add" onclick="addPort()">+ Add Port Mapping</button>
+          <div class="form-help" style="margin-top: 12px;">Map ports from host to container (e.g., 8080 → 80)</div>
+        </div>
+        
+        <div class="card">
+          <div class="section-title">Environment Variables</div>
+          <div id="envVars">
+            <div class="env-var">
+              <input type="text" class="port-input" placeholder="Key" data-type="env-key">
+              <input type="text" class="port-input" placeholder="Value" data-type="env-value">
+              <button type="button" class="btn-remove" onclick="removeEnv(this)">Remove</button>
+            </div>
+          </div>
+          <button type="button" class="btn-add" onclick="addEnv()">+ Add Environment Variable</button>
+        </div>
+        
+        <div class="card">
+          <div class="section-title">Advanced Options</div>
+          
+          <div class="checkbox-group">
+            <input type="checkbox" class="checkbox-input" id="autoRestart" checked>
+            <label class="checkbox-label" for="autoRestart">Auto-restart on failure</label>
+          </div>
+          
+          <div class="checkbox-group">
+            <input type="checkbox" class="checkbox-input" id="attachTty" checked>
+            <label class="checkbox-label" for="attachTty">Allocate TTY (interactive)</label>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Network Mode</label>
+            <select class="form-select" id="networkMode">
+              <option value="bridge">Bridge (default)</option>
+              <option value="host">Host</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Command (optional)</label>
+            <input type="text" class="form-input" id="containerCmd" placeholder="/bin/bash">
+            <div class="form-help">Override the default container command</div>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn btn-cancel" onclick="window.location.href='/'">Cancel</button>
+          <button type="submit" class="btn btn-create">Create Container</button>
+        </div>
+      </form>
+    </div>
+    
+    <script>
+      let ws = null;
+      
+      function addPort() {
+        const container = document.getElementById('portMappings');
+        const portMapping = document.createElement('div');
+        portMapping.className = 'port-mapping';
+        portMapping.innerHTML = `
+          <input type="text" class="port-input" placeholder="Host Port" data-type="host">
+          <span style="color: #64748b;">→</span>
+          <input type="text" class="port-input" placeholder="Container Port" data-type="container">
+          <button type="button" class="btn-remove" onclick="removePort(this)">Remove</button>
+        `;
+        container.appendChild(portMapping);
+      }
+      
+      function removePort(btn) {
+        const container = document.getElementById('portMappings');
+        if (container.children.length > 1) {
+          btn.parentElement.remove();
+        }
+      }
+      
+      function addEnv() {
+        const container = document.getElementById('envVars');
+        const envVar = document.createElement('div');
+        envVar.className = 'env-var';
+        envVar.innerHTML = `
+          <input type="text" class="port-input" placeholder="Key" data-type="env-key">
+          <input type="text" class="port-input" placeholder="Value" data-type="env-value">
+          <button type="button" class="btn-remove" onclick="removeEnv(this)">Remove</button>
+        `;
+        container.appendChild(envVar);
+      }
+      
+      function removeEnv(btn) {
+        const container = document.getElementById('envVars');
+        if (container.children.length > 1) {
+          btn.parentElement.remove();
+        }
+      }
+      
+      function showStatus(message, type) {
+        const statusEl = document.getElementById('statusMessage');
+        statusEl.textContent = message;
+        statusEl.className = `status-message ${type}`;
+        
+        if (type === 'success') {
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 2000);
+        }
+      }
+      
+      function connectWebSocket() {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${scheme}://${location.host}`);
+        
+        ws.addEventListener('open', () => {
+          console.log('WebSocket connected');
+        });
+        
+        ws.addEventListener('message', (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            
+            if (data.type === 'container_action_result') {
+              const form = document.getElementById('createContainerForm');
+              form.classList.remove('loading');
+              
+              if (data.success) {
+                showStatus(`✅ Container created successfully! ID: ${data.containerId}`, 'success');
+              } else {
+                showStatus(`❌ Error: ${data.error}`, 'error');
+              }
+            }
+          } catch (err) {
+            console.error('Error parsing message:', err);
+          }
+        });
+        
+        ws.addEventListener('close', () => {
+          console.log('WebSocket disconnected, reconnecting...');
+          setTimeout(connectWebSocket, 1000);
+        });
+      }
+      
+      document.getElementById('createContainerForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        form.classList.add('loading');
+        
+        const name = document.getElementById('containerName').value;
+        const image = document.getElementById('containerImage').value;
+        const networkMode = document.getElementById('networkMode').value;
+        const cmd = document.getElementById('containerCmd').value;
+        const autoRestart = document.getElementById('autoRestart').checked;
+        const attachTty = document.getElementById('attachTty').checked;
+        
+        // Collect port mappings
+        const portMappings = {};
+        const exposedPorts = {};
+        document.querySelectorAll('#portMappings .port-mapping').forEach(mapping => {
+          const hostPort = mapping.querySelector('[data-type="host"]').value;
+          const containerPort = mapping.querySelector('[data-type="container"]').value;
+          
+          if (hostPort && containerPort) {
+            const key = `${containerPort}/tcp`;
+            exposedPorts[key] = {};
+            if (!portMappings[key]) {
+              portMappings[key] = [];
+            }
+            portMappings[key].push({ HostPort: hostPort });
+          }
+        });
+        
+        // Collect environment variables
+        const envVars = [];
+        document.querySelectorAll('#envVars .env-var').forEach(envVar => {
+          const key = envVar.querySelector('[data-type="env-key"]').value;
+          const value = envVar.querySelector('[data-type="env-value"]').value;
+          
+          if (key && value) {
+            envVars.push(`${key}=${value}`);
+          }
+        });
+        
+        const options = {
+          Image: image,
+          name: name,
+          Tty: attachTty,
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+          ExposedPorts: exposedPorts,
+          Env: envVars.length > 0 ? envVars : undefined,
+          Cmd: cmd ? [cmd] : undefined,
+          HostConfig: {
+            NetworkMode: networkMode,
+            PortBindings: portMappings,
+            RestartPolicy: autoRestart ? { Name: 'on-failure', MaximumRetryCount: 5 } : undefined,
+          }
+        };
+        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'create_container', options }));
+        } else {
+          form.classList.remove('loading');
+          showStatus('❌ WebSocket not connected. Please try again.', 'error');
+        }
+      });
+      
+      // Connect on page load
+      connectWebSocket();
+    </script>
+  </body>
+</html>

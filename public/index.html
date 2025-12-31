@@ -202,12 +202,201 @@
       .info-label { color: #94a3b8; font-size: 13px; }
       .info-value { color: #e2e8f0; font-weight: 600; font-size: 13px; }
       
+      .container-list {
+        max-height: 500px;
+        overflow-y: auto;
+      }
+      
+      .container-item {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .container-info {
+        flex: 1;
+      }
+      
+      .container-name {
+        font-weight: 600;
+        color: #60a5fa;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+      }
+      
+      .container-detail {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+      }
+      
+      .container-status {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-right: 8px;
+      }
+      
+      .container-status.running {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+      
+      .container-status.exited {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+      
+      .container-actions {
+        display: flex;
+        gap: 4px;
+      }
+      
+      .btn-small {
+        padding: 6px 10px;
+        font-size: 11px;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      
+      .btn-small:hover {
+        background: rgba(59, 130, 246, 0.3);
+        transform: translateY(-1px);
+      }
+      
+      .btn-small.danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      
+      .btn-small.danger:hover {
+        background: rgba(239, 68, 68, 0.3);
+      }
+      
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .modal.active {
+        display: flex;
+      }
+      
+      .modal-content {
+        background: rgba(17, 24, 39, 0.95);
+        border: 1px solid #1f2937;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 500px;
+        width: 90%;
+      }
+      
+      .modal-title {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0 0 16px;
+        color: #e2e8f0;
+      }
+      
+      .form-group {
+        margin-bottom: 16px;
+      }
+      
+      .form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+      
+      .form-input, .form-select {
+        width: 100%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #374151;
+        background: #0b1220;
+        color: #e2e8f0;
+        font-family: inherit;
+      }
+      
+      .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1);
+      }
+      
+      .modal-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      
+      .btn-cancel {
+        flex: 1;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+      
+      .btn-create {
+        flex: 1;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        color: white;
+      }
+      
+      .btn-create:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
+      }
+      
       @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
       }
       
       .pulse { animation: pulse 2s ease-in-out infinite; }
+      
+      @keyframes slideInRight {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+      }
       
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 4px; }
@@ -298,6 +487,20 @@
           <div style="text-align: center; color: #64748b; padding: 20px;">No servers connected</div>
         </div>
       </div>
+      
+      <!-- Docker Containers -->
+      <div class="card" style="margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="card-title" style="margin: 0;">🐳 Docker Containers</div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-small" id="refreshContainers" style="width: auto; padding: 8px 12px;">Refresh</button>
+            <a href="/create" class="btn-small" style="width: auto; padding: 8px 12px; text-decoration: none; display: inline-block;">+ Create</a>
+          </div>
+        </div>
+        <div class="container-list" id="containerList">
+          <div style="text-align: center; color: #64748b; padding: 20px;">Loading containers...</div>
+        </div>
+      </div>
     </div>
     
     <script>
@@ -323,6 +526,33 @@
         if (!isoString) return '-';
         const date = new Date(isoString);
         return date.toLocaleTimeString();
+      };
+      
+      const showStatus = (message, type = 'info') => {
+        // Create status notification
+        const statusDiv = document.createElement('div');
+        statusDiv.className = `status-notification status-${type}`;
+        statusDiv.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 15px 20px;
+          background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+          color: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 10000;
+          font-size: 14px;
+          animation: slideInRight 0.3s ease-out;
+        `;
+        statusDiv.textContent = message;
+        document.body.appendChild(statusDiv);
+        
+        // Auto-remove after 5 seconds or 8 seconds for errors
+        setTimeout(() => {
+          statusDiv.style.animation = 'slideOutRight 0.3s ease-in';
+          setTimeout(() => statusDiv.remove(), 300);
+        }, type === 'error' ? 8000 : 5000);
       };
       
       const updateMaintenanceUI = (maintenance) => {
@@ -379,6 +609,59 @@
         `).join('');
       };
       
+      const updateContainerList = (containers) => {
+        const list = document.getElementById('containerList');
+        
+        if (!containers || containers.length === 0) {
+          list.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No containers found</div>';
+          return;
+        }
+        
+        list.innerHTML = containers.map(container => {
+          const isRunning = container.status === 'running';
+          const ports = container.ports.length > 0 ? container.ports.join(', ') : 'No ports';
+          
+          return `
+            <div class="container-item">
+              <div class="container-info">
+                <div class="container-name">${container.name}</div>
+                <div class="container-detail">📦 ${container.image}</div>
+                <div class="container-detail">🔌 ${ports}</div>
+                ${container.user ? `<div class="container-detail">👤 User: ${container.user}</div>` : ''}
+                ${container.description ? `<div class="container-detail">📝 ${container.description}</div>` : ''}
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="container-status ${isRunning ? 'running' : 'exited'}">${isRunning ? 'RUNNING' : 'STOPPED'}</span>
+                <div class="container-actions">
+                  ${isRunning ? `<button class="btn-small" onclick="stopContainer('${container.id}')">Stop</button>` : `<button class="btn-small" onclick="startContainer('${container.id}')">Start</button>`}
+                  <button class="btn-small danger" onclick="removeContainer('${container.id}')">Delete</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      };
+      
+      const stopContainer = (containerId) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'stop_container', containerId }));
+        }
+      };
+      
+      const startContainer = (containerId) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'start_container', containerId }));
+        }
+      };
+      
+      const removeContainer = (containerId) => {
+        if (confirm(`Are you sure you want to delete this container?`)) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'remove_container', containerId }));
+          }
+        }
+      };
+      
       const connectWebSocket = () => {
         const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
         ws = new WebSocket(`${scheme}://${location.host}`);
@@ -390,6 +673,7 @@
           
           // Request initial data
           ws.send(JSON.stringify({ type: 'get_servers' }));
+          ws.send(JSON.stringify({ type: 'get_containers' }));
         });
         
         ws.addEventListener('close', () => {
@@ -441,9 +725,27 @@
               updateMaintenanceUI(data.maintenance);
             }
             
+            if (data.type === 'container_list') {
+              updateContainerList(data.containers);
+            }
+            
             if (data.type === 'server_list') {
               updateServerList(data.servers);
               document.getElementById('totalConnections').textContent = data.servers.length;
+            }
+            
+            if (data.type === 'container_action_result') {
+              if (data.success) {
+                console.log(`Container ${data.action} successful`);
+                // Refresh container list
+                setTimeout(() => {
+                  if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'get_containers' }));
+                  }
+                }, 500);
+              } else {
+                alert(`Error: ${data.error}`);
+              }
             }
             
             if (data.type === 'health_response') {
@@ -451,6 +753,50 @@
                 updateMaintenanceUI(data.maintenance);
               }
               document.getElementById('totalConnections').textContent = data.connections || 0;
+            }
+            
+            // Handle image pulling status updates
+            if (data.type === 'image_pull_start') {
+              console.log(`Starting to pull image: ${data.image}`);
+              showStatus(`Pulling Docker image: ${data.image}...`, 'info');
+            }
+            
+            if (data.type === 'image_pull_progress') {
+              const progress = data.progress ? ` (${data.progress}%)` : '';
+              console.log(`Pull progress [${data.image}]: ${data.status}${progress}`);
+              showStatus(`Downloading: ${data.status}${progress}`, 'info');
+            }
+            
+            if (data.type === 'image_pull_complete') {
+              console.log(`Image pull completed: ${data.image}`);
+              showStatus(`✓ Image downloaded: ${data.image}`, 'success');
+            }
+            
+            if (data.type === 'image_pull_error') {
+              console.error(`Image pull error: ${data.error}`);
+              showStatus(`✗ Image pull failed: ${data.error}`, 'error');
+            }
+            
+            // Handle container creation status updates
+            if (data.type === 'container_create_start') {
+              console.log(`Creating container for image: ${data.image}`);
+              showStatus(`Creating container...`, 'info');
+            }
+            
+            if (data.type === 'container_create_complete') {
+              console.log(`Container created: ${data.containerId}`);
+              showStatus(`✓ Container created: ${data.containerId}`, 'success');
+              // Refresh container list after a brief delay
+              setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'get_containers' }));
+                }
+              }, 1000);
+            }
+            
+            if (data.type === 'container_create_error') {
+              console.error(`Container creation error: ${data.error}`);
+              showStatus(`✗ Container creation failed: ${data.error}`, 'error');
             }
             
           } catch (err) {
@@ -463,6 +809,13 @@
       document.getElementById('toggleMaintenance').addEventListener('click', () => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'toggle_maintenance' }));
+        }
+      });
+      
+      // Refresh containers
+      document.getElementById('refreshContainers').addEventListener('click', () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'get_containers' }));
         }
       });
       
