@@ -2,3 +2,4 @@ node_modules
 .nebula
 dist
 volumes
+.nebula
